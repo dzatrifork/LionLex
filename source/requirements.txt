@@ -1,0 +1,4 @@
+chromadb==0.4.3
+pypdf==3.12.2
+chainlit==0.6.1
+langchain==0.0.244
