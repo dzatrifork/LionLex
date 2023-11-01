@@ -1,5 +1,5 @@
 chromadb==0.4.3
 pypdf==3.12.2
-chainlit==0.6.1
+chainlit==0.7.4
 langchain==0.0.244
 tiktoken==0.5.1
