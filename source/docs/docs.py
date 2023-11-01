@@ -16,8 +16,11 @@ if os.path.exists(".env"):
 loader = PyPDFLoader("../../assets/GDPR_CELEX_32016R0679_EN_TXT.pdf")
 text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=50)
 pages = loader.load_and_split(text_splitter)
+
+metadatas = [{"source": f"{i}-pl"} for i in range(len(pages))]
+    
 db = Chroma.from_documents(pages, OpenAIEmbeddings())
 
 query = "What constitutes a personal data breach under the GDPR?"
 docs = db.similarity_search(query)
-print(docs[0].page_content)
+print(docs[0].page_content + ' METADATA: ' + str(docs[0].metadata))
