@@ -5,8 +5,11 @@ from langchain.document_loaders import TextLoader
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import Chroma
-from langchain.document_loaders import PyPDFLoader, PyMuPDFLoader
+from langchain.document_loaders import PyMuPDFLoader
 from langchain.chains import RetrievalQAWithSourcesChain
+from langchain.schema import BaseLLMOutputParser
+from langchain.chains.query_constructor.base import AttributeInfo
+from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain.chat_models import ChatOpenAI
 from langchain.prompts.chat import (
     ChatPromptTemplate,
@@ -22,6 +25,8 @@ if os.path.exists(".env"):
     config = dotenv_values(".env")
 
 vectorStoreReady = False
+
+
 async def prepareVectorStore():
     if os.path.exists("../../assets/data/chroma"):
         # Load the vector store from disk
@@ -36,8 +41,10 @@ async def prepareVectorStore():
         text_splitter = CharacterTextSplitter(chunk_size=200, chunk_overlap=10)
         pages = loader.load_and_split(text_splitter)
         print('Finished splitting text...')
-        db = Chroma.from_documents(pages, OpenAIEmbeddings(
-        ), persist_directory='../../assets/data/chroma')
+        db = Chroma.from_documents(
+            pages,
+            OpenAIEmbeddings(),
+            persist_directory='../../assets/data/chroma')
     print('Finished creating vector store!')
     return [db, True]
 
@@ -47,6 +54,7 @@ async def prepareVectorStore():
 def updateMessage(msg, content):
     msg.content = content
     msg.update()
+
 
 async def askUserSelectAction():
     res = await cl.AskActionMessage(
@@ -64,15 +72,7 @@ async def askUserSelectAction():
     cl.user_session.set("action", res.get("value"))
 
 
-@cl.on_chat_start
-async def start():
-    msg = cl.Message(content="")
-    await msg.send()
-    if (vectorStoreReady) == False:
-        updateMessage(msg, "Loading vector store...")
-        await prepareVectorStore()
-        updateMessage(msg, "Vector store loaded!")
-
+def createQuestionChain():
     # Configure system prompt
     system_template = """Use the following pieces of context to answer the users question.
     If you don't know the answer, just say that you don't know, don't try to make up an answer.
@@ -89,6 +89,8 @@ async def start():
     chain_type_kwargs = {"prompt": prompt}
 
     llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-16k")
+    
+    # TODO: Play with retriever parameters (https://python.langchain.com/docs/use_cases/question_answering/vector_db_qa#vectorstore-retriever-options)
     chain = RetrievalQAWithSourcesChain.from_chain_type(
         llm=llm,
         chain_type="stuff",
@@ -97,7 +99,67 @@ async def start():
         chain_type_kwargs=chain_type_kwargs,
     )
 
+    return chain
+
+
+def createDifferenceChain():
+    # Configure system prompt
+    # TODO: Convert overenskomst documents to markdown and embed in vector store with metadata regarding the chapter/section title.
+    # TODO: Create a chain that can find the difference between two documents. Using SelfQueryRetriever to fetch correct documents for each version.
+    # TODO: Make user able to ask questions about specific topics they want to know the differences about. 
+    difference_template = """Summarize the differences using the following list of differences in the two texts.
+    You should focus 
+    ----------------
+    {differences}"""
+
+    llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-16k")
+    chain = (difference_template | llm | BaseLLMOutputParser())
+    
+    # metadata_field_info = [
+    #     AttributeInfo(
+    #         name="page",
+    #         description="The number of the page",
+    #         type="integer",
+    #     ),
+    #     AttributeInfo(
+    #         name="source",
+    #         description="The document source",
+    #         type="integer",
+    #     ),
+    # ]
+    # retriever = SelfQueryRetriever.from_llm(
+    #     llm,
+    #     db,
+    #     'Snippets from the EU GDPR Regulations',
+    #     metadata_field_info=metadata_field_info,
+    # )
+    
+    return chain
+
+def createChain(action):
+    match action:
+        case "difference":
+            return createDifferenceChain()
+        case "question":
+            return createQuestionChain()
+        case _:
+            return None
+
+
+@cl.on_chat_start
+async def start():
+    msg = cl.Message(content="")
+    await msg.send()
+    if (vectorStoreReady) == False:
+        updateMessage(msg, "Loading vector store...")
+        await prepareVectorStore()
+        updateMessage(msg, "Vector store loaded!")
+
+    chain = createQuestionChain()
     await askUserSelectAction()
+    action = cl.user_session.get("action")
+
+    chain = createChain(action)
 
     # Store the chain in the user session
     cl.user_session.set("chain", chain)
@@ -111,16 +173,17 @@ async def message(clMessage: cl.Message):
     action = cl.user_session.get("action")
 
     if action == "difference":
-        await cl.Message(content="Not implemented yet!").send()
         await askUserSelectAction()
         return
 
     if action == "question":
+        # TODO Enable the user to ask more questions and retain the context from the previous questions
+        # TODO Handle cases where the user asks a question that should not look at sources. E.g. "Test" or "What is a Banana pancake?". Maybe use higher threshold for retrieval?
+        # TODO Play around with different parameters (temp, chunk_size, chunk_overlap, k, etc.) to get better results
         print("Question asked: " + message)
         response = await chain.acall(message)
         answer = response["answer"]
         source_documents = response["source_documents"]
-        pages = 'Pages: '
 
         message = f"Answer: {answer}\n\nSources:"
         source_elements = []
