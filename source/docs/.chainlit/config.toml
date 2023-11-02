@@ -40,23 +40,23 @@ hide_cot = false
 
 # Override default MUI light theme. (Check theme.ts)
 [UI.theme.light]
-    #background = "#FAFAFA"
-    #paper = "#FFFFFF"
+    #background = "#97BDD3"
+    #paper = "#D5E3EB"
 
     [UI.theme.light.primary]
-        #main = "#F80061"
-        #dark = "#980039"
-        #light = "#FFE7EB"
+        #main = "#FF6600"
+        #dark = "#2C3A42"
+        #light = "#F4F5F6"
 
 # Override default MUI dark theme. (Check theme.ts)
 [UI.theme.dark]
-    #background = "#FAFAFA"
-    #paper = "#FFFFFF"
+    #background = "#97BDD3"
+    #paper = "#D5E3EB"
 
     [UI.theme.dark.primary]
-        #main = "#F80061"
-        #dark = "#980039"
-        #light = "#FFE7EB"
+        #main = "#FF6600"
+        #dark = "#2C3A42"
+        #light = "#F4F5F6"
 
 
 [meta]
