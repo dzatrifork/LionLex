@@ -1,4 +1,7 @@
 .env
 .vscode/
 assets/data/chroma
-source/docs/__pycache__
+/__pycache__
+.idea/
+.venv/
+venv/

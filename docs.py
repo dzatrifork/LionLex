@@ -1,23 +1,20 @@
 import asyncio
 import os
+
+import chainlit as cl
 from dotenv import dotenv_values, load_dotenv
-from langchain.document_loaders import TextLoader
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.vectorstores import Chroma
-from langchain.document_loaders import PyMuPDFLoader
 from langchain.chains import RetrievalQAWithSourcesChain
-from langchain.schema import BaseLLMOutputParser
-from langchain.chains.query_constructor.base import AttributeInfo
-from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain.chat_models import ChatOpenAI
+from langchain.document_loaders import PyMuPDFLoader
+from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.prompts.chat import (
     ChatPromptTemplate,
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
 )
-
-import chainlit as cl
+from langchain.schema import BaseLLMOutputParser
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores import Chroma
 
 # Load environment variables from .env file
 if os.path.exists(".env"):
@@ -28,15 +25,15 @@ vectorStoreReady = False
 
 
 async def prepareVectorStore():
-    if os.path.exists("../../assets/data/chroma"):
+    if os.path.exists("assets/data/chroma"):
         # Load the vector store from disk
         print('Creating vector store from existing data...')
-        db = Chroma(persist_directory='../../assets/data/chroma',
+        db = Chroma(persist_directory='assets/data/chroma',
                     embedding_function=OpenAIEmbeddings())
     else:
         # Load the document, split it into chunks, embed each chunk and load it into the vector store.
         print('Creating vector store...')
-        loader = PyMuPDFLoader("../../assets/GDPR_CELEX_32016R0679_EN_TXT.pdf")
+        loader = PyMuPDFLoader("assets/GDPR_CELEX_32016R0679_EN_TXT.pdf")
         print('Loaded PDF file...')
         text_splitter = CharacterTextSplitter(chunk_size=200, chunk_overlap=10)
         pages = loader.load_and_split(text_splitter)
@@ -44,9 +41,10 @@ async def prepareVectorStore():
         db = Chroma.from_documents(
             pages,
             OpenAIEmbeddings(),
-            persist_directory='../../assets/data/chroma')
+            persist_directory='assets/data/chroma')
     print('Finished creating vector store!')
     return [db, True]
+
 
 [db, vectorStoreReady] = asyncio.run(prepareVectorStore())
 
@@ -89,7 +87,7 @@ def createQuestionChain():
     chain_type_kwargs = {"prompt": prompt}
 
     llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-16k")
-    
+
     # TODO: Play with retriever parameters (https://python.langchain.com/docs/use_cases/question_answering/vector_db_qa#vectorstore-retriever-options)
     chain = RetrievalQAWithSourcesChain.from_chain_type(
         llm=llm,
@@ -114,7 +112,7 @@ def createDifferenceChain():
 
     llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-16k")
     chain = (difference_template | llm | BaseLLMOutputParser())
-    
+
     # metadata_field_info = [
     #     AttributeInfo(
     #         name="page",
@@ -133,8 +131,9 @@ def createDifferenceChain():
     #     'Snippets from the EU GDPR Regulations',
     #     metadata_field_info=metadata_field_info,
     # )
-    
+
     return chain
+
 
 def createChain(action):
     match action:
