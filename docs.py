@@ -4,9 +4,9 @@ import os
 import chainlit as cl
 from dotenv import dotenv_values, load_dotenv
 from langchain.chains import RetrievalQAWithSourcesChain
-from langchain.chat_models import ChatOpenAI
+from langchain.chat_models import AzureChatOpenAI
 from langchain.document_loaders import PyMuPDFLoader
-from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.embeddings.azure_openai import AzureOpenAIEmbeddings
 from langchain.prompts.chat import (
     ChatPromptTemplate,
     SystemMessagePromptTemplate,
@@ -25,11 +25,14 @@ vectorStoreReady = False
 
 
 async def prepareVectorStore():
+    ai_embeddings = AzureOpenAIEmbeddings(
+        deployment="embedding",
+        model="text-embedding-ada-002")
     if os.path.exists("assets/data/chroma"):
         # Load the vector store from disk
         print('Creating vector store from existing data...')
         db = Chroma(persist_directory='assets/data/chroma',
-                    embedding_function=OpenAIEmbeddings())
+                    embedding_function=ai_embeddings)
     else:
         # Load the document, split it into chunks, embed each chunk and load it into the vector store.
         print('Creating vector store...')
@@ -40,7 +43,7 @@ async def prepareVectorStore():
         print('Finished splitting text...')
         db = Chroma.from_documents(
             pages,
-            OpenAIEmbeddings(),
+            ai_embeddings,
             persist_directory='assets/data/chroma')
     print('Finished creating vector store!')
     return [db, True]
@@ -72,7 +75,8 @@ async def askUserSelectAction():
 
 def createQuestionChain():
     # Configure system prompt
-    system_template = """Use the following pieces of context to answer the users question.
+    system_template = """You're a helpful assistant who answers questions about GDPR
+    Use the following pieces of context to answer the users question.
     If you don't know the answer, just say that you don't know, don't try to make up an answer.
     ALWAYS return a "SOURCES" part in your answer.
     The "SOURCES" part should be a reference to the source of the document from which you got your answer.
@@ -86,7 +90,7 @@ def createQuestionChain():
     prompt = ChatPromptTemplate.from_messages(messages)
     chain_type_kwargs = {"prompt": prompt}
 
-    llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-16k")
+    llm = AzureChatOpenAI(azure_deployment="gpt-4-32k", temperature=0.9, model="gpt-4-32k")
 
     # TODO: Play with retriever parameters (https://python.langchain.com/docs/use_cases/question_answering/vector_db_qa#vectorstore-retriever-options)
     chain = RetrievalQAWithSourcesChain.from_chain_type(
@@ -110,7 +114,7 @@ def createDifferenceChain():
     ----------------
     {differences}"""
 
-    llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-16k")
+    llm = AzureChatOpenAI(azure_deployment="gpt-4-32k", temperature=0.9, model="gpt-4-32k")
     chain = (difference_template | llm | BaseLLMOutputParser())
 
     # metadata_field_info = [

@@ -13,6 +13,16 @@ pip install -r .\requirements.txt
 
 # Run
 
+Setup `.env` file with the following variables:
+
+````agsl
+OPENAI_API_TYPE=azure
+OPENAI_API_VERSION=2023-05-15
+AZURE_OPENAI_ENDPOINT=https:<your-endpoint>
+AZURE_OPENAI_API_KEY=<your-key>
+````
+
+
 ```bash 
 chainlit run docs.py
 ```
